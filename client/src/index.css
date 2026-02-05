@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #2563eb;
+  --color-secondary: #475569;
+}
+
+
+html, body {
+  height: 100%;
+  background-color: #f8fafc; /* Slate-50 */
+}
+
+#root {
+  height: 100%;
+}
