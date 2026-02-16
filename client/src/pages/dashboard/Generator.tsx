@@ -1,467 +1,9 @@
-// import { useState, useEffect, useCallback } from "react";
-// import { useLocation } from "react-router-dom";
-// import { useAppStore } from "../../store/useAppstore";
-// import { useJobStream } from "../../store/useJobStream";
-// import { ThumbnailCanvas } from "../../components/editor/ThumbnailCanvas";
-// import { generateThumbnail } from "../../api/client";
-// import * as fabric from "fabric";
-// import {
-//   Download,
-//   Type,
-//   RefreshCw,
-//   Upload,
-//   Trash2,
-//   Bold,
-//   Italic,
-//   Underline,
-//   Image as ImageIcon,
-//   Sparkles,
-//   CheckSquare,
-//   ArrowLeft,
-//   Palette,
-//   MousePointerClick,
-// } from "lucide-react";
-// import clsx from "clsx";
-// import { getMockJobResult } from "../../api/mock";
-
-// const FONTS = ["Arial", "Times New Roman", "Impact", "Verdana", "Helvetica"];
-
-// export const Generator = () => {
-//   const { state } = useLocation();
-//   const { selectedPlatform, setPlatform, credits, decrementCredits } =
-//     useAppStore();
-//   const { startStream, status, data, progress } = useJobStream();
-
-//   // --- INPUT STATES ---
-//   const [description, setDescription] = useState(state?.prompt || "");
-//   const [useStyleRef, setUseStyleRef] = useState(!!state?.styleId); // Checkbox for style
-//   const [userUpload, setUserUpload] = useState<File | null>(null); // User context image
-
-//   // --- FLOW STATES ---
-//   // 1. generatedVariants: The array of 3 images returned by AI
-//   // 2. selectedVariant: The single image chosen for editing
-//   const [generatedVariants, setGeneratedVariants] = useState<string[]>([]);
-//   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
-
-//   // --- EDITOR STATES ---
-//   const [canvasRef, setCanvasRef] = useState<fabric.Canvas | null>(null);
-//   // const [activeObject, setActiveObject] = useState<fabric.Object | null>(null);
-//   const [activeObject, setActiveObject] = useState<any>(null);
-//   const [textProps, setTextProps] = useState({
-//     fill: "#ffffff",
-//     stroke: "#000000",
-//     strokeWidth: 2,
-//     fontFamily: "Impact",
-//     fontWeight: "normal",
-//     fontStyle: "normal",
-//     underline: false,
-//     fontSize: 60,
-//   });
-
-//   const isProcessing = status === "processing" || status === "pending";
-
-//   // ---------------------------------------------------------------------------
-//   // EFFECT: Handle Job Completion
-//   // ---------------------------------------------------------------------------
-//   useEffect(() => {
-//     if (data?.result?.imageUrl) {
-//       setGeneratedVariants(data.result.imageUrl);
-//       setSelectedVariant(null); // Reset selection so user sees the 3 choices
-//     }
-//   }, [data]);
-
-//   // ---------------------------------------------------------------------------
-//   // ACTION: Generate
-//   // ---------------------------------------------------------------------------
-//   const handleAiGenerate = async () => {
-//     if (!description.trim() || credits <= 0) return;
-
-//     // In a real app, you would append 'userUpload' to FormData here
-//     console.log("Generating with:", {
-//       description,
-//       platform: selectedPlatform,
-//       useStyleRef,
-//       userFile: userUpload?.name,
-//     });
-
-//     try {
-//       // Clear previous
-//       setGeneratedVariants([]);
-//       setSelectedVariant(null);
-
-//       const res = await generateThumbnail({
-//         description,
-//         platform: selectedPlatform,
-//         styleReferenceId: useStyleRef ? "fav-123" : undefined,
-//       });
-//       // getMockJobResult("lajdf")
-
-//       decrementCredits();
-//       startStream(res.data.jobId);
-//     } catch (err) {
-//       console.error(err);
-//     }
-//   };
-
-//   // ---------------------------------------------------------------------------
-//   // ACTION: Handle File Upload
-//   // ---------------------------------------------------------------------------
-//   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     if (e.target.files && e.target.files[0]) {
-//       setUserUpload(e.target.files[0]);
-//     }
-//   };
-
-//   // ---------------------------------------------------------------------------
-//   // CANVAS HELPERS (Fabric.js)
-//   // ---------------------------------------------------------------------------
-//   const handleAddText = () => {
-//     if (!canvasRef) return;
-//     const text = new fabric.IText("CLICK TO EDIT", {
-//       left: 100,
-//       top: 100,
-//       fontFamily: textProps.fontFamily,
-//       fill: textProps.fill,
-//       stroke: textProps.stroke,
-//       strokeWidth: textProps.strokeWidth,
-//       fontSize: 80,
-//       fontWeight: "bold",
-//     });
-//     canvasRef.add(text);
-//     canvasRef.setActiveObject(text);
-//   };
-
-//   const updateUIFromSelection = useCallback(() => {
-//     if (!canvasRef) return;
-//     const active = canvasRef.getActiveObject();
-//     setActiveObject(active);
-//     if (active instanceof fabric.IText) {
-//       // Sync state... (omitted for brevity, same as previous step)
-//     }
-//   }, [canvasRef]);
-
-//   useEffect(() => {
-//     if (!canvasRef) return;
-//     canvasRef.on("selection:created", updateUIFromSelection);
-//     canvasRef.on("selection:updated", updateUIFromSelection);
-//     canvasRef.on("selection:cleared", () => setActiveObject(null));
-//     return () => {
-//       canvasRef.off("selection:created");
-//       canvasRef.off("selection:updated");
-//       canvasRef.off("selection:cleared");
-//     };
-//   }, [canvasRef, updateUIFromSelection]);
-
-//   const modifyActiveObject = (key: string, val: any) => {
-//     if (canvasRef && activeObject) {
-//       activeObject.set(key, val);
-//       setTextProps((prev) => ({ ...prev, [key]: val }));
-//       canvasRef.requestRenderAll();
-//     }
-//   };
-
-//   const handleDownload = () => {
-//     if (!canvasRef) return;
-//     try {
-//       const link = document.createElement("a");
-//       link.href = canvasRef.toDataURL({
-//         format: "png",
-//         quality: 1,
-//         multiplier: 2,
-//       });
-//       link.download = `thumbnail-${Date.now()}.png`;
-//       link.click();
-//     } catch (e) {
-//       alert("CORS Error on Download");
-//     }
-//   };
-
-//   // ---------------------------------------------------------------------------
-//   // RENDER
-//   // ---------------------------------------------------------------------------
-//   return (
-//     <div className="flex h-full bg-slate-50">
-//       {/* ================= LEFT PANEL: INPUTS ================= */}
-//       <div className="w-[380px] bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto">
-//         <div className="p-6 space-y-6">
-//           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-//             <Sparkles className="text-primary" /> Generator
-//           </h2>
-
-//           {/* 1. Prompt */}
-//           <div>
-//             <label className="text-sm font-bold text-gray-700 block mb-2">
-//               Description
-//             </label>
-//             <textarea
-//               value={description}
-//               onChange={(e) => setDescription(e.target.value)}
-//               disabled={isProcessing}
-//               placeholder="E.g. A futuristic robot shaking hands with a human..."
-//               className="w-full h-24 p-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary resize-none"
-//             />
-//           </div>
-
-//           {/* 2. Context / Upload */}
-//           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-//             <div className="flex items-center justify-between">
-//               <label className="text-sm font-bold text-gray-700">
-//                 Context Image
-//               </label>
-//               <span className="text-[10px] bg-gray-200 px-2 rounded text-gray-600">
-//                 Optional
-//               </span>
-//             </div>
-
-//             {!userUpload ? (
-//               <label className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
-//                 <Upload size={20} className="text-gray-400 mb-1" />
-//                 <span className="text-xs text-gray-500">
-//                   Upload Reference (Face/Product)
-//                 </span>
-//                 <input
-//                   type="file"
-//                   className="hidden"
-//                   onChange={handleFileUpload}
-//                   accept="image/*"
-//                 />
-//               </label>
-//             ) : (
-//               <div className="flex items-center justify-between bg-white p-2 rounded border">
-//                 <span className="text-xs truncate max-w-[200px]">
-//                   {userUpload.name}
-//                 </span>
-//                 <button
-//                   onClick={() => setUserUpload(null)}
-//                   className="text-red-500 hover:text-red-700"
-//                 >
-//                   <Trash2 size={14} />
-//                 </button>
-//               </div>
-//             )}
-//           </div>
-
-//           {/* 3. Style Reference Checkbox */}
-//           <div
-//             onClick={() => setUseStyleRef(!useStyleRef)}
-//             className={clsx(
-//               "flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all",
-//               useStyleRef
-//                 ? "bg-purple-50 border-purple-300"
-//                 : "bg-white border-gray-200 hover:border-gray-300",
-//             )}
-//           >
-//             <div
-//               className={clsx(
-//                 "w-5 h-5 rounded flex items-center justify-center border",
-//                 useStyleRef
-//                   ? "bg-purple-600 border-purple-600"
-//                   : "bg-white border-gray-400",
-//               )}
-//             >
-//               {useStyleRef && <CheckSquare size={14} className="text-white" />}
-//             </div>
-//             <div>
-//               <p
-//                 className={clsx(
-//                   "text-sm font-bold",
-//                   useStyleRef ? "text-purple-900" : "text-gray-700",
-//                 )}
-//               >
-//                 Use Favorite Style
-//               </p>
-//               <p className="text-xs text-gray-500">
-//                 Applies consistent branding/color grading.
-//               </p>
-//             </div>
-//           </div>
-
-//           {/* Generate Button */}
-//           <button
-//             onClick={handleAiGenerate}
-//             disabled={isProcessing || !description}
-//             className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
-//           >
-//             {isProcessing ? (
-//               <RefreshCw className="animate-spin" />
-//             ) : (
-//               <Sparkles />
-//             )}
-//             Generate 3 Variants
-//           </button>
-//         </div>
-
-//         {/* EDITOR CONTROLS (Only show if editing) */}
-//         {selectedVariant && (
-//           <div className="mt-auto border-t border-gray-200 p-6 bg-slate-50">
-//             <div className="flex items-center justify-between mb-4">
-//               <h3 className="font-bold text-gray-700 flex items-center gap-2">
-//                 <Palette size={16} /> Text Editor
-//               </h3>
-//             </div>
-
-//             <button
-//               onClick={handleAddText}
-//               className="w-full py-2 bg-white border border-gray-300 rounded mb-4 text-sm font-medium hover:bg-gray-50"
-//             >
-//               + Add Big Text
-//             </button>
-
-//             {/* Simple Properties */}
-//             <div className="grid grid-cols-2 gap-2">
-//               <div>
-//                 <label className="text-xs text-gray-500 font-bold">Font</label>
-//                 <select
-//                   value={textProps.fontFamily}
-//                   onChange={(e) =>
-//                     modifyActiveObject("fontFamily", e.target.value)
-//                   }
-//                   className="w-full text-sm border rounded p-1"
-//                 >
-//                   {FONTS.map((f) => (
-//                     <option key={f} value={f}>
-//                       {f}
-//                     </option>
-//                   ))}
-//                 </select>
-//               </div>
-//               <div>
-//                 <label className="text-xs text-gray-500 font-bold">Color</label>
-//                 <div className="flex items-center gap-2 border rounded bg-white p-1">
-//                   <input
-//                     type="color"
-//                     value={textProps.fill}
-//                     onChange={(e) => modifyActiveObject("fill", e.target.value)}
-//                     className="w-full h-5 cursor-pointer"
-//                   />
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-//         )}
-//       </div>
-
-//       {/* ================= RIGHT PANEL: VIEWPORT ================= */}
-//       <div className="flex-1 relative flex flex-col h-full overflow-hidden">
-//         {/* Header */}
-//         <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8">
-//           {selectedVariant ? (
-//             <button
-//               onClick={() => setSelectedVariant(null)}
-//               className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
-//             >
-//               <ArrowLeft size={18} /> Back to Results
-//             </button>
-//           ) : (
-//             <h2 className="font-bold text-gray-700">Generation Results</h2>
-//           )}
-
-//           {selectedVariant && (
-//             <button
-//               onClick={handleDownload}
-//               className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-green-700 flex items-center gap-2"
-//             >
-//               <Download size={16} /> Export
-//             </button>
-//           )}
-//         </div>
-
-//         {/* MAIN CONTENT AREA */}
-//         <div className="flex-1 bg-slate-100 p-8 overflow-y-auto flex items-center justify-center">
-//           {/* STATE 1: LOADING */}
-//           {isProcessing && (
-//             <div className="text-center">
-//               <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-6"></div>
-//               <h2 className="text-2xl font-bold text-gray-800">
-//                 Generating 3 Concepts...
-//               </h2>
-//               <p className="text-gray-500 mt-2">
-//                 Analyzing prompt • Applying style • Rendering
-//               </p>
-//               <div className="w-64 h-2 bg-gray-200 rounded-full mt-6 mx-auto overflow-hidden">
-//                 <div
-//                   className="h-full bg-blue-600 transition-all duration-300"
-//                   style={{ width: `${progress}%` }}
-//                 ></div>
-//               </div>
-//             </div>
-//           )}
-
-//           {/* STATE 2: EMPTY START */}
-//           {!isProcessing && generatedVariants.length === 0 && (
-//             <div className="text-center opacity-40">
-//               <ImageIcon size={64} className="mx-auto mb-4" />
-//               <p className="text-xl font-medium">Enter a prompt to start</p>
-//             </div>
-//           )}
-
-//           {/* STATE 3: SELECTION GRID (The "3 AI Images" View) */}
-//           {!isProcessing &&
-//             generatedVariants.length > 0 &&
-//             !selectedVariant && (
-//               <div className="w-full max-w-6xl">
-//                 <div className="text-center mb-8">
-//                   <h2 className="text-2xl font-bold text-gray-800">
-//                     Select the best variant
-//                   </h2>
-//                   <p className="text-gray-500">
-//                     Click an image to edit and add text
-//                   </p>
-//                 </div>
-
-//                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-//                   {generatedVariants.map((imgUrl, idx) => (
-//                     <div
-//                       key={idx}
-//                       onClick={() => setSelectedVariant(imgUrl)}
-//                       className="group relative aspect-video bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:ring-4 hover:ring-blue-500 hover:shadow-xl transition-all transform hover:-translate-y-1"
-//                     >
-//                       <img
-//                         src={imgUrl}
-//                         alt={`Variant ${idx}`}
-//                         className="w-full h-full object-cover"
-//                       />
-
-//                       {/* Hover Overlay */}
-//                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
-//                         <MousePointerClick size={32} className="mb-2" />
-//                         <span className="font-bold bg-white/20 backdrop-blur px-4 py-1 rounded-full">
-//                           Select & Edit
-//                         </span>
-//                       </div>
-//                       <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-//                         Option {idx + 1}
-//                       </div>
-//                     </div>
-//                   ))}
-//                 </div>
-//               </div>
-//             )}
-
-//           {/* STATE 4: CANVAS EDITOR (One Image Selected) */}
-//           {selectedVariant && (
-//             <div className="w-full h-full flex items-center justify-center">
-//               <div className="shadow-2xl rounded-lg overflow-hidden border-8 border-white transform scale-90">
-//                 <ThumbnailCanvas
-//                   platform={selectedPlatform}
-//                   imageUrl={selectedVariant}
-//                   onReady={setCanvasRef}
-//                 />
-//               </div>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { useAppStore } from "../../store/useAppstore";
+import { useAppStore } from "../../store/useAppStore";
 import { useJobStream } from "../../store/useJobStream";
 import { ThumbnailCanvas } from "../../components/editor/ThumbnailCanvas";
-import { generateThumbnail } from "../../api/client";
+import { generateThumbnail, handleMagicEdit } from "../../api/client";
 import * as fabric from "fabric";
 import {
   Download,
@@ -472,24 +14,25 @@ import {
   Bold,
   Italic,
   Underline,
-  Image as ImageIcon,
   Sparkles,
   CheckSquare,
   ArrowLeft,
   Palette,
-  MousePointerClick,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
   Layers,
   Square,
   Circle,
-  Move,
-  Sun,
-  Type as TypeIcon,
+  Youtube,
+  Instagram,
+  Wand2,
+  ZoomIn,
+  ZoomOut,
+  MonitorPlay,
+  X,
+  Loader2,
 } from "lucide-react";
 import clsx from "clsx";
 
+// --- CONSTANTS ---
 const FONTS = [
   "Impact",
   "Arial",
@@ -497,6 +40,7 @@ const FONTS = [
   "Verdana",
   "Courier New",
   "Helvetica",
+  "Inter",
 ];
 const COLORS = [
   "#ffffff",
@@ -506,18 +50,34 @@ const COLORS = [
   "#3b82f6",
   "#10b981",
   "#8b5cf6",
+  "#ec4899",
+];
+const VIBES = [
+  "Cinematic",
+  "Minimalist",
+  "Gaming",
+  "Clickbait",
+  "Corporate",
+  "Neon",
 ];
 
 export const Generator = () => {
   const { state } = useLocation();
   const { selectedPlatform, setPlatform, credits, decrementCredits } =
     useAppStore();
-  const { startStream, status, data, progress } = useJobStream();
+  const { startStream, status, data } = useJobStream();
+
+  // --- RESIZABLE SIDEBAR STATE ---
+  const [sidebarWidth, setSidebarWidth] = useState(400);
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   // --- INPUT STATES ---
   const [description, setDescription] = useState(state?.prompt || "");
   const [useStyleRef, setUseStyleRef] = useState(!!state?.styleId);
   const [userUpload, setUserUpload] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
 
   // --- FLOW STATES ---
   const [generatedVariants, setGeneratedVariants] = useState<string[]>([]);
@@ -526,6 +86,125 @@ export const Generator = () => {
   // --- EDITOR STATES ---
   const [canvasRef, setCanvasRef] = useState<fabric.Canvas | null>(null);
   const [activeObject, setActiveObject] = useState<fabric.Object | any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  // --- EDIT MODE STATES ---
+  const [editInstruction, setEditInstruction] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+
+  const isProcessing = status === "processing" || status === "pending";
+
+  // --- ACTIONS ---
+
+  const handleEditFunction = async () => {
+    if (!selectedVariant || !editInstruction) return;
+
+    // 1. Set Local Loading State
+    setIsEditing(true);
+
+    try {
+      console.log("Sending Edit Request for:", selectedVariant);
+
+      const res: any = await handleMagicEdit({
+        prompt: editInstruction,
+        platform: selectedPlatform,
+        imageUrl: selectedVariant,
+      });
+
+      decrementCredits();
+
+      // 2. Start Stream (Pass true for isEditMode if your hook supports it)
+      startStream(res.data.jobId, true);
+
+      setEditInstruction("");
+    } catch (error) {
+      console.error("Edit failed", error);
+      alert("Failed to start magic edit. Check console.");
+    } finally {
+      setIsEditing(false); // Ensure we reset loading state
+    }
+  };
+
+  const handleAiGenerate = async () => {
+    if (!description.trim() || credits <= 0) return;
+
+    // Append vibe to prompt if selected
+    const finalPrompt = selectedVibe
+      ? `${selectedVibe} style: ${description}`
+      : description;
+
+    try {
+      setGeneratedVariants([]);
+      setSelectedVariant(null);
+
+      const res: any = await generateThumbnail({
+        prompt: finalPrompt,
+        platform: selectedPlatform,
+        userUpload: userUpload,
+        // Pass the styleId from state if available, or boolean flag
+        useStyleRef: useStyleRef,
+        styleId: state?.styleId,
+      });
+
+      decrementCredits();
+      startStream(res.data.jobId, false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleVariantSelect = (url: string) => {
+    setSelectedVariant(url);
+    if (canvasRef) {
+      // Only change background, don't clear canvas
+      fabric.Image.fromURL(url, { crossOrigin: "anonymous" }).then((img) => {
+        // Scale logic to fit canvas
+        const canvasWidth = 1280;
+        const canvasHeight = 720;
+        const scale = Math.max(
+          canvasWidth / img.width!,
+          canvasHeight / img.height!,
+        );
+
+        img.set({
+          originX: "center",
+          originY: "center",
+          left: canvasWidth / 2,
+          top: canvasHeight / 2,
+          scaleX: scale,
+          scaleY: scale,
+          selectable: false,
+          evented: false,
+        });
+
+        // Remove old background if exists
+        const oldBg = canvasRef
+          .getObjects()
+          .find((o) => (o as any).data?.type === "background");
+        if (oldBg) canvasRef.remove(oldBg);
+
+        img.set("data", { type: "background" });
+        canvasRef.add(img);
+        canvasRef.sendObjectToBack(img);
+        canvasRef.renderAll();
+      });
+    }
+  };
+
+  const handleDownload = () => {
+    if (!canvasRef) return;
+    const link = document.createElement("a");
+    link.href = canvasRef.toDataURL({
+      format: "png",
+      quality: 1,
+      multiplier: 2, // High Res Export
+    });
+    link.download = `thumbnail-${Date.now()}.png`;
+    link.click();
+  };
+
+  // --- CANVAS & UI STATE MANAGEMENT ---
 
   // Consolidated properties for UI
   const [props, setProps] = useState({
@@ -539,25 +218,22 @@ export const Generator = () => {
     fontStyle: "normal",
     underline: false,
     textAlign: "left",
-    charSpacing: 0,
-    lineHeight: 1.2,
     opacity: 1,
     shadow: false,
   });
 
-  const isProcessing = status === "processing" || status === "pending";
-
-  // ---------------------------------------------------------------------------
-  // SYNC CANVAS & UI
-  // ---------------------------------------------------------------------------
+  // Sync Data from Stream
   useEffect(() => {
-    if (data?.result?.imageUrl) {
-      setGeneratedVariants(data.result.imageUrl);
-      // Automatically select the first one if not set
-      if (!selectedVariant) setSelectedVariant(null);
+    if (data?.result?.imageUrls) {
+      setGeneratedVariants(data.result.imageUrls);
+      // Auto-select first variant only if we aren't already viewing one
+      if (!selectedVariant && data.result.imageUrls.length > 0) {
+        // Optional: setSelectedVariant(data.result.imageUrls[0]);
+      }
     }
   }, [data]);
 
+  // Update UI when selection changes on Canvas
   const updateUIFromSelection = useCallback(() => {
     if (!canvasRef) return;
     const active = canvasRef.getActiveObject();
@@ -568,7 +244,7 @@ export const Generator = () => {
         ...prev,
         fill: (active.fill as string) || "#ffffff",
         opacity: active.opacity ?? 1,
-        // @ts-ignore - Fabric types can be tricky
+        // @ts-ignore
         backgroundColor: active.backgroundColor || "",
       }));
 
@@ -580,11 +256,7 @@ export const Generator = () => {
           fontWeight: (active.fontWeight as string) || "normal",
           fontStyle: (active.fontStyle as string) || "normal",
           underline: active.underline || false,
-          stroke: (active.stroke as string) || "#000000",
-          strokeWidth: active.strokeWidth || 0,
           textAlign: active.textAlign || "left",
-          charSpacing: active.charSpacing || 0,
-          lineHeight: active.lineHeight || 1.2,
           shadow: !!active.shadow,
         }));
       }
@@ -596,7 +268,6 @@ export const Generator = () => {
     canvasRef.on("selection:created", updateUIFromSelection);
     canvasRef.on("selection:updated", updateUIFromSelection);
     canvasRef.on("selection:cleared", () => setActiveObject(null));
-    // Listen for object modification (drag/resize)
     canvasRef.on("object:modified", updateUIFromSelection);
     return () => {
       canvasRef.off("selection:created");
@@ -606,47 +277,87 @@ export const Generator = () => {
     };
   }, [canvasRef, updateUIFromSelection]);
 
-  // ---------------------------------------------------------------------------
-  // ACTIONS: EDITOR
-  // ---------------------------------------------------------------------------
-
-  // Generic modifier for any property
+  // Helper: Modify Object Properties
   const modify = (key: string, value: any) => {
     if (!canvasRef || !activeObject) return;
-
     if (key === "shadow") {
-      if (value) {
-        activeObject.set(
-          "shadow",
-          new fabric.Shadow({
-            color: "black",
-            blur: 15,
-            offsetX: 5,
-            offsetY: 5,
-          }),
-        );
-      } else {
-        activeObject.set("shadow", null);
-      }
+      activeObject.set(
+        "shadow",
+        value
+          ? new fabric.Shadow({
+              color: "black",
+              blur: 15,
+              offsetX: 5,
+              offsetY: 5,
+            })
+          : null,
+      );
     } else {
       activeObject.set(key, value);
     }
-
     setProps((prev) => ({ ...prev, [key]: value }));
     canvasRef.requestRenderAll();
   };
 
-  const addText = (text = "NEW TEXT", size = 80) => {
+  // Helper: Layer Ordering
+  const layerAction = (action: "up" | "down") => {
+    if (!canvasRef || !activeObject) return;
+    action === "up"
+      ? activeObject.bringToFront()
+      : activeObject.sendBackwards();
+    canvasRef.renderAll();
+  };
+
+  // --- FILE HANDLING ---
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUserUpload(file);
+      const objectUrl = URL.createObjectURL(file);
+      setUploadPreview(objectUrl);
+    }
+  };
+
+  const clearUpload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUserUpload(null);
+    setUploadPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // --- RESIZE HANDLERS ---
+  const startResizing = useCallback(() => setIsResizing(true), []);
+  const stopResizing = useCallback(() => setIsResizing(false), []);
+  const resize = useCallback(
+    (mouseMoveEvent: MouseEvent) => {
+      if (isResizing) {
+        const newWidth = mouseMoveEvent.clientX;
+        if (newWidth >= 300 && newWidth <= 600) setSidebarWidth(newWidth);
+      }
+    },
+    [isResizing],
+  );
+
+  useEffect(() => {
+    window.addEventListener("mousemove", resize);
+    window.addEventListener("mouseup", stopResizing);
+    return () => {
+      window.removeEventListener("mousemove", resize);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [resize, stopResizing]);
+
+  // --- FABRIC HELPERS ---
+  const addText = () => {
     if (!canvasRef) return;
-    const t = new fabric.IText(text, {
+    const t = new fabric.IText("HEADLINE", {
       left: 100,
       top: 100,
-      fontFamily: props.fontFamily,
-      fill: props.fill,
-      fontSize: size,
-      fontWeight: "bold",
+      fontFamily: "Impact",
+      fill: "#ffffff",
+      fontSize: 80,
       shadow: new fabric.Shadow({
-        color: "rgba(0,0,0,0.8)",
+        color: "black",
         blur: 10,
         offsetX: 4,
         offsetY: 4,
@@ -658,512 +369,516 @@ export const Generator = () => {
 
   const addShape = (type: "rect" | "circle") => {
     if (!canvasRef) return;
-    let shape;
-    if (type === "rect") {
-      shape = new fabric.Rect({
-        left: 150,
-        top: 150,
-        width: 200,
-        height: 100,
-        fill: props.fill,
-      });
-    } else {
-      shape = new fabric.Circle({
-        left: 150,
-        top: 150,
-        radius: 60,
-        fill: props.fill,
-      });
-    }
+    const shape =
+      type === "rect"
+        ? new fabric.Rect({
+            left: 150,
+            top: 150,
+            width: 200,
+            height: 100,
+            fill: "#3b82f6",
+          })
+        : new fabric.Circle({
+            left: 150,
+            top: 150,
+            radius: 60,
+            fill: "#ef4444",
+          });
     canvasRef.add(shape);
     canvasRef.setActiveObject(shape);
   };
 
-  const layerAction = (action: "up" | "down") => {
-    if (!canvasRef || !activeObject) return;
-    if (action === "up") activeObject.bringToFront();
-    else activeObject.sendBackwards();
-    // Ensure background image stays at very back?
-    // The canvas wrapper usually locks bg, but this helps organize new text vs shapes
-    canvasRef.renderAll();
-  };
-
-  // ---------------------------------------------------------------------------
-  // ACTIONS: API
-  // ---------------------------------------------------------------------------
-  const handleAiGenerate = async () => {
-    if (!description.trim() || credits <= 0) return;
-    try {
-      setGeneratedVariants([]);
-      setSelectedVariant(null);
-      const res = await generateThumbnail({
-        description,
-        platform: selectedPlatform,
-        styleReferenceId: useStyleRef ? "fav-1" : undefined,
-      });
-      decrementCredits();
-      startStream(res.data.jobId);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDownload = () => {
-    if (!canvasRef) return;
-    try {
-      const link = document.createElement("a");
-      link.href = canvasRef.toDataURL({
-        format: "png",
-        quality: 1,
-        multiplier: 2,
-      });
-      link.download = `thumbnail-${Date.now()}.png`;
-      link.click();
-    } catch (e) {
-      alert("CORS Error: Canvas tainted.");
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // RENDER
-  // ---------------------------------------------------------------------------
   return (
-    <div className="flex h-full bg-slate-50 overflow-hidden">
-      {/* ================= LEFT PANEL: TOOLS ================= */}
-      <div className="w-[360px] bg-white border-r border-gray-200 flex flex-col h-full z-10 shadow-xl">
-        {/* HEADER */}
-        <div className="p-4 border-b border-gray-100 flex items-center gap-2">
-          <div className="p-2 bg-blue-100 rounded-lg text-primary">
-            <Palette size={20} />
-          </div>
-          <div>
-            <h1 className="font-bold text-gray-800 leading-tight">
-              Studio Editor
-            </h1>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">
-              Professional Mode
-            </p>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {/* 1. SELECTION / PROMPT MODE */}
+    <div
+      className={clsx(
+        "flex h-full bg-[#131314] text-[#E3E3E3] font-sans overflow-hidden",
+        isResizing && "select-none cursor-col-resize",
+      )}
+    >
+      {/* ================= LEFT PANEL ================= */}
+      <div
+        ref={sidebarRef}
+        className="flex flex-col border-r border-white/10 bg-[#1E1F20] z-20 shadow-2xl shrink-0"
+        style={{ width: sidebarWidth }}
+      >
+        <div className="flex-1 overflow-y-hidden custom-scrollbar p-5 space-y-4">
+          {/* 1. PLATFORM SELECTOR */}
           {!selectedVariant && (
-            <div className="p-5 space-y-5">
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">
+            <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+              <label className="text-[11px] font-bold text-[#C4C7C5] uppercase tracking-wider mb-2 flex items-center gap-2">
+                <MonitorPlay size={12} /> Target Platform
+              </label>
+              <div className="grid grid-cols-2 bg-[#131314] p-1 rounded-lg border border-white/10">
+                <button
+                  onClick={() => setPlatform("youtube")}
+                  className={clsx(
+                    "flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-medium transition-all",
+                    selectedPlatform === "youtube"
+                      ? "bg-[#2D2E30] text-white shadow-sm border border-white/5"
+                      : "text-[#80868B] hover:text-[#E3E3E3]",
+                  )}
+                >
+                  <Youtube
+                    size={16}
+                    className={
+                      selectedPlatform === "youtube" ? "text-red-500" : ""
+                    }
+                  />
+                  <span className="truncate">YouTube</span>
+                </button>
+                <button
+                  onClick={() => setPlatform("instagram")}
+                  className={clsx(
+                    "flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-medium transition-all",
+                    selectedPlatform === "instagram"
+                      ? "bg-[#2D2E30] text-white shadow-sm border border-white/5"
+                      : "text-[#80868B] hover:text-[#E3E3E3]",
+                  )}
+                >
+                  <Instagram
+                    size={16}
+                    className={
+                      selectedPlatform === "instagram" ? "text-pink-500" : ""
+                    }
+                  />
+                  <span className="truncate">Instagram</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 2. PROMPT INPUT */}
+          {!selectedVariant && (
+            <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-75">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[11px] font-bold text-[#C4C7C5] uppercase tracking-wider">
                   Prompt
                 </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  disabled={isProcessing}
-                  placeholder="Describe your thumbnail..."
-                  className="w-full h-32 p-3 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all resize-none"
-                />
+                <button className="text-[10px] flex items-center gap-1 text-[#A8C7FA] hover:text-white transition-colors">
+                  <Wand2 size={10} /> Enhance
+                </button>
               </div>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={isProcessing}
+                placeholder={`Describe your thumbnail...`}
+                className="w-full h-32 bg-[#131314] border border-white/10 rounded-lg p-4 text-sm text-[#E3E3E3] placeholder:text-white/20 focus:outline-none focus:border-[#A8C7FA] focus:ring-1 focus:ring-[#A8C7FA]/20 resize-none transition-all leading-relaxed"
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {VIBES.map((vibe) => (
+                  <button
+                    key={vibe}
+                    onClick={() =>
+                      setSelectedVibe(selectedVibe === vibe ? null : vibe)
+                    }
+                    className={clsx(
+                      "text-[10px] px-3 py-1 rounded-full border transition-all",
+                      selectedVibe === vibe
+                        ? "bg-[#A8C7FA] text-[#040404] border-[#A8C7FA] font-medium"
+                        : "bg-transparent border-white/10 text-[#C4C7C5] hover:border-white/30",
+                    )}
+                  >
+                    {vibe}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-              {/* Upload & Options */}
-              <div className="grid grid-cols-2 gap-3">
-                <label className="border border-dashed border-gray-300 rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
-                  <Upload size={16} className="text-gray-400 mb-1" />
-                  <span className="text-[10px] font-bold text-gray-500">
-                    Context Img
-                  </span>
+          {/* 3. ASSETS & REFERENCE */}
+          {!selectedVariant && (
+            <div className="animate-in fade-in slide-in-from-left-4 duration-500 delay-100">
+              <label className="text-[11px] font-bold text-[#C4C7C5] uppercase tracking-wider mb-3 block">
+                Reference Assets
+              </label>
+              <div className="space-y-3">
+                {/* Visual Image Dropzone */}
+                <div
+                  className={clsx(
+                    "relative group border border-dashed rounded-xl transition-all h-28 flex flex-col items-center justify-center cursor-pointer overflow-hidden",
+                    uploadPreview
+                      ? "border-[#A8C7FA]/50 bg-[#A8C7FA]/5"
+                      : "border-white/20 hover:border-[#A8C7FA] hover:bg-[#131314]",
+                  )}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadPreview ? (
+                    <>
+                      <img
+                        src={uploadPreview}
+                        alt="Preview"
+                        className="absolute inset-0 w-full h-full object-cover opacity-60"
+                      />
+                      <button
+                        onClick={clearUpload}
+                        className="absolute inset-0 m-auto w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-red-500/80 text-white rounded-full backdrop-blur-sm z-10"
+                      >
+                        <X size={16} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-10 h-10 rounded-full bg-[#131314] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform text-[#C4C7C5] group-hover:text-[#A8C7FA]">
+                        <Upload size={18} />
+                      </div>
+                      <span className="text-xs text-[#C4C7C5]">
+                        Click to upload face/product
+                      </span>
+                    </>
+                  )}
                   <input
+                    ref={fileInputRef}
                     type="file"
                     className="hidden"
-                    onChange={(e) => setUserUpload(e.target.files?.[0] || null)}
+                    accept="image/*"
+                    onChange={handleFileUpload}
                   />
-                </label>
+                </div>
+
+                {/* Style Reference Toggle */}
                 <div
                   onClick={() => setUseStyleRef(!useStyleRef)}
                   className={clsx(
-                    "border rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer",
+                    "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all",
                     useStyleRef
-                      ? "bg-purple-50 border-purple-300"
-                      : "hover:bg-gray-50 border-gray-300",
+                      ? "bg-[#A8C7FA]/10 border-[#A8C7FA]"
+                      : "bg-[#131314] border-white/10 hover:border-white/30",
                   )}
                 >
-                  <Sparkles
-                    size={16}
-                    className={
-                      useStyleRef
-                        ? "text-purple-600 mb-1"
-                        : "text-gray-400 mb-1"
-                    }
-                  />
-                  <span
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={clsx(
+                        "p-2 rounded-md",
+                        useStyleRef
+                          ? "bg-[#A8C7FA] text-black"
+                          : "bg-[#1E1F20] text-[#C4C7C5]",
+                      )}
+                    >
+                      <Palette size={16} />
+                    </div>
+                    <div>
+                      <div
+                        className={clsx(
+                          "text-xs font-medium",
+                          useStyleRef ? "text-[#A8C7FA]" : "text-[#E3E3E3]",
+                        )}
+                      >
+                        Match Visual Style
+                      </div>
+                      <div className="text-[10px] text-[#80868B]">
+                        Uses favorite style preset
+                      </div>
+                    </div>
+                  </div>
+                  <div
                     className={clsx(
-                      "text-[10px] font-bold",
-                      useStyleRef ? "text-purple-700" : "text-gray-500",
+                      "w-4 h-4 rounded border flex items-center justify-center transition-colors",
+                      useStyleRef
+                        ? "bg-[#A8C7FA] border-[#A8C7FA]"
+                        : "border-white/30",
                     )}
                   >
-                    Style Ref
-                  </span>
+                    {useStyleRef && (
+                      <CheckSquare size={10} className="text-black" />
+                    )}
+                  </div>
                 </div>
               </div>
+            </div>
+          )}
 
+          {/* GENERATE BUTTON */}
+          {!selectedVariant && (
+            <div className="pt-4 animate-in fade-in slide-in-from-left-4 duration-500 delay-150">
               <button
                 onClick={handleAiGenerate}
                 disabled={isProcessing || !description}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                className="w-full relative group overflow-hidden bg-[#A8C7FA] hover:bg-[#D3E3FD] disabled:opacity-50 disabled:cursor-not-allowed text-[#040404] font-semibold py-4 rounded-xl shadow-lg transition-all"
               >
-                {isProcessing ? (
-                  <RefreshCw className="animate-spin" />
-                ) : (
-                  <Sparkles />
-                )}
-                Generate Variants
+                <div className="relative z-10 flex items-center justify-center gap-2">
+                  {isProcessing ? (
+                    <RefreshCw size={18} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={18} />
+                  )}
+                  <span>
+                    {isProcessing ? "Generating..." : "Generate Thumbnails"}
+                  </span>
+                </div>
               </button>
             </div>
           )}
 
-          {/* 2. EDITING MODE */}
+          {/* 4. CANVAS EDIT MODE CONTROLS */}
           {selectedVariant && (
-            <div className="p-5 space-y-6 animate-in slide-in-from-left-4 duration-300">
+            <div className="animate-in slide-in-from-right-4 duration-300 space-y-6">
               <button
                 onClick={() => setSelectedVariant(null)}
-                className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-blue-600 mb-2"
+                className="flex items-center gap-2 text-xs text-[#C4C7C5] hover:text-white transition-colors"
               >
-                <ArrowLeft size={14} /> BACK TO GENERATION
+                <ArrowLeft size={14} /> Back to Generation
               </button>
 
-              {/* Add Items */}
               <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => addText("HEADLINE")}
-                  className="p-3 border rounded-lg hover:bg-gray-50 flex flex-col items-center gap-1"
-                >
-                  <TypeIcon size={20} className="text-gray-700" />
-                  <span className="text-[10px] font-bold">Text</span>
-                </button>
-                <button
-                  onClick={() => addShape("rect")}
-                  className="p-3 border rounded-lg hover:bg-gray-50 flex flex-col items-center gap-1"
-                >
-                  <Square size={20} className="text-gray-700" />
-                  <span className="text-[10px] font-bold">Rect</span>
-                </button>
-                <button
-                  onClick={() => addShape("circle")}
-                  className="p-3 border rounded-lg hover:bg-gray-50 flex flex-col items-center gap-1"
-                >
-                  <Circle size={20} className="text-gray-700" />
-                  <span className="text-[10px] font-bold">Circle</span>
-                </button>
+                {[
+                  { icon: Type, label: "Text", action: addText },
+                  {
+                    icon: Square,
+                    label: "Box",
+                    action: () => addShape("rect"),
+                  },
+                  {
+                    icon: Circle,
+                    label: "Circle",
+                    action: () => addShape("circle"),
+                  },
+                ].map((tool, i) => (
+                  <button
+                    key={i}
+                    onClick={tool.action}
+                    className="flex flex-col items-center justify-center gap-2 p-4 bg-[#131314] border border-white/10 rounded-lg hover:border-[#A8C7FA] hover:bg-[#1A1B1E] transition-all text-[#C4C7C5] hover:text-[#A8C7FA]"
+                  >
+                    <tool.icon size={20} />
+                    <span className="text-[10px] font-medium">
+                      {tool.label}
+                    </span>
+                  </button>
+                ))}
               </div>
 
+              {/* PROPERTIES / MAGIC EDIT PANEL */}
               {activeObject ? (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <span className="text-xs font-bold uppercase text-gray-400">
-                      Properties
+                <div className="bg-[#131314] rounded-xl border border-white/10 p-4 space-y-5 shadow-inner">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-xs font-semibold text-white">
+                      Edit Properties
                     </span>
-                    <div className="flex gap-1">
+                    <button
+                      onClick={() =>
+                        activeObject &&
+                        (canvasRef?.remove(activeObject),
+                        canvasRef?.discardActiveObject())
+                      }
+                      className="p-1.5 hover:bg-red-500/20 text-[#C4C7C5] hover:text-red-500 rounded"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  {/* ... Color/Font/Size Controls ... */}
+                  <div className="flex flex-wrap gap-2">
+                    {COLORS.map((c) => (
                       <button
-                        onClick={() => layerAction("up")}
-                        className="p-1 hover:bg-gray-100 rounded"
-                        title="Bring Forward"
-                      >
-                        <Layers size={14} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          activeObject &&
-                          (canvasRef?.remove(activeObject),
-                          canvasRef?.discardActiveObject())
-                        }
-                        className="p-1 hover:bg-red-50 text-red-500 rounded"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Color Pickers */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-500">
-                      COLORS
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 border rounded p-1">
-                          <input
-                            type="color"
-                            value={props.fill}
-                            onChange={(e) => modify("fill", e.target.value)}
-                            className="w-6 h-6 border-none bg-transparent cursor-pointer"
-                          />
-                          <span className="text-xs text-gray-500">Fill</span>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 border rounded p-1">
-                          <input
-                            type="color"
-                            value={props.stroke}
-                            onChange={(e) => modify("stroke", e.target.value)}
-                            className="w-6 h-6 border-none bg-transparent cursor-pointer"
-                          />
-                          <span className="text-xs text-gray-500">Stroke</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 overflow-x-auto pb-1">
-                      {COLORS.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => modify("fill", c)}
-                          className="w-6 h-6 rounded-full border border-gray-200 flex-shrink-0"
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Text Specifics */}
-                  {activeObject instanceof fabric.IText && (
-                    <>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500">
-                          TYPOGRAPHY
-                        </label>
-                        <select
-                          value={props.fontFamily}
-                          onChange={(e) => modify("fontFamily", e.target.value)}
-                          className="w-full text-xs border rounded p-2 bg-white"
-                        >
-                          {FONTS.map((f) => (
-                            <option key={f} value={f}>
-                              {f}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="flex gap-1">
-                          {[
-                            {
-                              icon: Bold,
-                              key: "fontWeight",
-                              val: "bold",
-                              active: props.fontWeight === "bold",
-                            },
-                            {
-                              icon: Italic,
-                              key: "fontStyle",
-                              val: "italic",
-                              active: props.fontStyle === "italic",
-                            },
-                            {
-                              icon: Underline,
-                              key: "underline",
-                              val: true,
-                              active: props.underline,
-                            },
-                          ].map((btn, i) => (
-                            <button
-                              key={i}
-                              onClick={() =>
-                                modify(btn.key, btn.active ? "normal" : btn.val)
-                              }
-                              className={clsx(
-                                "flex-1 py-2 border rounded flex justify-center",
-                                btn.active
-                                  ? "bg-blue-100 text-blue-600 border-blue-200"
-                                  : "bg-white text-gray-600",
-                              )}
-                            >
-                              <btn.icon size={14} />
-                            </button>
-                          ))}
-                        </div>
-                        <div className="flex gap-1">
-                          {["left", "center", "right"].map((align) => (
-                            <button
-                              key={align}
-                              onClick={() => modify("textAlign", align)}
-                              className={clsx(
-                                "flex-1 py-2 border rounded flex justify-center",
-                                props.textAlign === align
-                                  ? "bg-gray-200"
-                                  : "bg-white",
-                              )}
-                            >
-                              {align === "left" && <AlignLeft size={14} />}
-                              {align === "center" && <AlignCenter size={14} />}
-                              {align === "right" && <AlignRight size={14} />}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Text Highlight */}
-                      <div>
-                        <label className="text-[10px] font-bold text-gray-500 mb-1 block">
-                          BACKGROUND HIGHLIGHT
-                        </label>
-                        <div className="flex gap-2 items-center">
-                          <button
-                            onClick={() => modify("backgroundColor", "")}
-                            className="p-1 border rounded text-[10px] px-2"
-                          >
-                            None
-                          </button>
-                          <button
-                            onClick={() => modify("backgroundColor", "#000000")}
-                            className="w-6 h-6 bg-black border rounded"
-                          ></button>
-                          <button
-                            onClick={() => modify("backgroundColor", "#ffffff")}
-                            className="w-6 h-6 bg-white border rounded"
-                          ></button>
-                          <button
-                            onClick={() => modify("backgroundColor", "#ef4444")}
-                            className="w-6 h-6 bg-red-500 border rounded"
-                          ></button>
-                          <button
-                            onClick={() => modify("backgroundColor", "#facc15")}
-                            className="w-6 h-6 bg-yellow-400 border rounded"
-                          ></button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Opacity & Shadow */}
-                  <div className="space-y-3 pt-2 border-t">
-                    <div>
-                      <div className="flex justify-between text-[10px] font-bold text-gray-500 mb-1">
-                        <span>OPACITY</span>
-                        <span>{Math.round(props.opacity * 100)}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={props.opacity}
-                        onChange={(e) =>
-                          modify("opacity", parseFloat(e.target.value))
-                        }
-                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        key={c}
+                        onClick={() => modify("fill", c)}
+                        className={`w-5 h-5 rounded-full border border-white/20 hover:scale-110 transition-transform ${props.fill === c ? "ring-2 ring-white" : ""}`}
+                        style={{ backgroundColor: c }}
                       />
-                    </div>
-
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={props.shadow}
-                        onChange={(e) => modify("shadow", e.target.checked)}
-                        className="rounded text-blue-600"
-                      />
-                      <span className="text-xs font-medium">Drop Shadow</span>
-                    </label>
+                    ))}
                   </div>
+                  {/* Slider */}
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={props.opacity}
+                    onChange={(e) =>
+                      modify("opacity", parseFloat(e.target.value))
+                    }
+                    className="w-full h-1 bg-[#2D2E30] rounded-lg cursor-pointer accent-[#A8C7FA]"
+                  />
                 </div>
               ) : (
-                <div className="p-8 text-center border-2 border-dashed border-gray-200 rounded-xl">
-                  <MousePointerClick
-                    className="mx-auto text-gray-300 mb-2"
-                    size={32}
+                // MAGIC EDIT INPUT
+                <div className="h-36 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl bg-[#131314/50] text-[#80868B] p-4">
+                  <textarea
+                    value={editInstruction}
+                    onChange={(e) => setEditInstruction(e.target.value)}
+                    disabled={isProcessing || isEditing}
+                    placeholder="✨ Describe AI edit (e.g. 'Make the background purple')..."
+                    className="w-full h-full bg-transparent border-none text-sm text-[#E3E3E3] placeholder:text-white/20 focus:ring-0 resize-none text-center"
                   />
-                  <p className="text-xs text-gray-400">
-                    Select an object on the canvas to customize it.
-                  </p>
+                  <button
+                    onClick={handleEditFunction}
+                    disabled={!editInstruction || isEditing}
+                    className="w-full py-2 bg-[#2D2E30] hover:bg-[#A8C7FA] hover:text-black text-white text-xs font-bold rounded-lg mt-2 transition-all flex justify-center gap-2"
+                  >
+                    {isEditing ? (
+                      <Loader2 className="animate-spin" size={14} />
+                    ) : (
+                      <Wand2 size={14} />
+                    )}
+                    Magic Edit
+                  </button>
                 </div>
               )}
 
               <button
                 onClick={handleDownload}
-                className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-sm flex items-center justify-center gap-2 transition-all mt-4"
+                className="w-full py-3 bg-[#E3E3E3] hover:bg-white text-black font-semibold rounded-lg shadow flex items-center justify-center gap-2 transition-all"
               >
-                <Download size={18} /> Export PNG
+                <Download size={18} /> Export Final
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* ================= RIGHT PANEL: CANVAS & FILMSTRIP ================= */}
-      <div className="flex-1 flex flex-col relative bg-slate-900">
-        {/* Canvas Area */}
-        <div className="flex-1 flex items-center justify-center p-8 overflow-hidden relative">
-          {/* Loading State */}
-          {isProcessing && (
-            <div className="text-center text-white z-20">
-              <div className="w-16 h-16 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-6"></div>
-              <h2 className="text-2xl font-bold">Creating Magic...</h2>
-            </div>
-          )}
+      {/* ================= RESIZE HANDLE ================= */}
+      <div
+        onMouseDown={startResizing}
+        className={clsx(
+          "w-1 h-full cursor-col-resize hover:bg-[#A8C7FA] transition-colors z-30 flex flex-col justify-center items-center group",
+          isResizing ? "bg-[#A8C7FA]" : "bg-transparent",
+        )}
+      >
+        <div className="h-8 w-1 bg-white/10 rounded-full group-hover:bg-transparent transition-colors"></div>
+      </div>
 
-          {/* Empty State */}
-          {!isProcessing && generatedVariants.length === 0 && (
-            <div className="text-center opacity-30 text-white">
-              <Sparkles size={64} className="mx-auto mb-4" />
-              <p className="text-xl font-medium">Your canvas is waiting</p>
-            </div>
-          )}
-
-          {/* Canvas Container */}
+      {/* ================= RIGHT PANEL ================= */}
+      <div className="flex-1 flex flex-col relative bg-[#131314] overflow-hidden">
+        {/* CANVAS AREA */}
+        <div className="flex-1 flex items-center justify-center p-10 overflow-hidden relative">
           <div
-            className={clsx(
-              "transition-all duration-500",
-              selectedVariant
-                ? "scale-100 opacity-100"
-                : "scale-90 opacity-0 hidden",
-            )}
-          >
-            <div className="shadow-2xl overflow-hidden border border-gray-700">
-              <ThumbnailCanvas
-                platform={selectedPlatform}
-                imageUrl={selectedVariant}
-                onReady={setCanvasRef}
-              />
-            </div>
-          </div>
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          ></div>
 
-          {/* Grid Selection (When no specific variant selected but we have results) */}
-          {!selectedVariant && generatedVariants.length > 0 && (
-            <div className="w-full max-w-5xl animate-in fade-in zoom-in duration-300">
-              <h2 className="text-white text-2xl font-bold text-center mb-8">
-                Choose a style to edit
-              </h2>
-              <div className="grid grid-cols-3 gap-8">
-                {generatedVariants.map((img, i) => (
-                  <div
-                    key={i}
-                    onClick={() => setSelectedVariant(img)}
-                    className="group cursor-pointer relative"
-                  >
-                    <img
-                      src={img}
-                      className="rounded-xl shadow-2xl hover:scale-105 transition-transform duration-300 border-4 border-transparent hover:border-blue-500"
-                    />
-                    <div className="absolute -bottom-10 left-0 right-0 text-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold">
-                      Click to Edit
-                    </div>
-                  </div>
-                ))}
+          {isProcessing ? (
+            <div className="text-center z-10">
+              <div className="relative w-24 h-24 mx-auto mb-6">
+                <div className="absolute inset-0 border-4 border-white/5 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-[#A8C7FA] border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Sparkles
+                    className="text-[#A8C7FA] animate-pulse"
+                    size={32}
+                  />
+                </div>
               </div>
+              <h2 className="text-xl font-medium text-white mb-2">
+                Generating Assets
+              </h2>
+              <p className="text-sm text-[#80868B]">
+                AI is analyzing your prompt and reference...
+              </p>
             </div>
+          ) : generatedVariants.length === 0 ? (
+            <div className="text-center max-w-md">
+              <div className="w-20 h-20 bg-[#1E1F20] rounded-2xl border border-white/5 flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                <Palette size={32} className="text-[#80868B]" />
+              </div>
+              <h2 className="text-xl font-medium text-[#E3E3E3] mb-2">
+                Ready to Design
+              </h2>
+              <p className="text-sm text-[#80868B]">
+                Configure your platform and prompt on the left.
+              </p>
+            </div>
+          ) : (
+            // CANVAS
+            <>
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-[#1E1F20] border border-white/10 rounded-lg p-1 shadow-2xl">
+                <button
+                  className="p-2 text-[#C4C7C5] hover:text-white rounded"
+                  onClick={() => setZoomLevel((z) => Math.max(z - 0.1, 0.2))}
+                >
+                  <ZoomOut size={16} />
+                </button>
+                <span className="text-xs text-[#80868B] font-mono px-2">
+                  {Math.round(zoomLevel * 100)}%
+                </span>
+                <button
+                  className="p-2 text-[#C4C7C5] hover:text-white rounded"
+                  onClick={() => setZoomLevel((z) => Math.min(z + 0.1, 2))}
+                >
+                  <ZoomIn size={16} />
+                </button>
+              </div>
+              <div
+                className={clsx(
+                  "relative shadow-2xl transition-all duration-500",
+                  selectedVariant
+                    ? "scale-100 opacity-100"
+                    : "scale-95 opacity-0 hidden",
+                )}
+              >
+                <div
+                  className="border border-white/10 rounded-sm overflow-hidden ring-1 ring-white/5 "
+                  style={{
+                    transform: `scale(${zoomLevel})`,
+                    willChange: "transform",
+                  }}
+                >
+                  <ThumbnailCanvas
+                    platform={selectedPlatform}
+                    imageUrl={selectedVariant}
+                    onReady={setCanvasRef}
+                  />
+                </div>
+              </div>
+            </>
           )}
+
+          {/* GRID SELECTION (If generated but not editing) */}
+          {!selectedVariant &&
+            generatedVariants.length > 0 &&
+            !isProcessing && (
+              <div className="absolute inset-0 z-10 p-12 py-4 flex flex-col items-center overflow-auto custom-scrollbar ">
+                <div className="max-w-5xl w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {generatedVariants.map((img, i) => (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          setSelectedVariant(img);
+                        }}
+                        className="group cursor-pointer relative bg-[#1E1F20] rounded-xl overflow-hidden border border-white/10 hover:border-[#A8C7FA] transition-all hover:-translate-y-1"
+                      >
+                        {/* object-cover aspect-video */}
+                        <img
+                          src={img}
+                          className="w-full h-full "
+                          alt={`Variant ${i}`}
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button className="bg-white text-black px-6 py-2 rounded-full text-xs font-bold">
+                            Customize
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
         </div>
 
-        {/* FILMSTRIP: Show other variants at bottom */}
+        {/* FILMSTRIP */}
         {selectedVariant && generatedVariants.length > 1 && (
-          <div className="h-24 bg-slate-800 border-t border-slate-700 flex items-center justify-center gap-4 px-4 z-20">
+          <div className="h-auto bg-[#1E1F20] border-t border-white/10 flex items-center justify-center gap-4 p-6 py-3 z-20 shrink-0 ">
             {generatedVariants.map((img, i) => (
               <div
                 key={i}
-                onClick={() => setSelectedVariant(img)}
+                onClick={() => {
+                  setSelectedVariant(img);
+                  handleVariantSelect(img);
+                }}
                 className={clsx(
-                  "h-16 aspect-video rounded-md overflow-hidden cursor-pointer border-2 transition-all hover:scale-110",
+                  "h-14 rounded-md overflow-hidden cursor-pointer transition-all border-2",
                   selectedVariant === img
-                    ? "border-blue-500 ring-2 ring-blue-500/50"
-                    : "border-transparent opacity-50 hover:opacity-100",
+                    ? "border-[#A8C7FA] opacity-100 scale-105"
+                    : "border-transparent opacity-40 hover:opacity-100",
                 )}
               >
-                <img src={img} className="w-full h-full object-cover" />
+                <img
+                  src={img}
+                  className="w-full h-full object-cover aspect-video"
+                />
               </div>
             ))}
           </div>

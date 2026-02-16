@@ -169,12 +169,14 @@ import { simulateJobStream, getMockJobResult } from '../api/mock';
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 interface UseJobStreamReturn {
-  startStream: (jobId: string) => void;
+  startStream: (jobId: string , isEditing?: boolean) => void;
   reset: () => void;
   status: JobResponse['status'] | 'idle';
   data: JobResponse | null;
   error: string | null;
   progress: number;
+  setIsEditing:any;
+  isEditing:any
 }
 
 export const useJobStream = (): UseJobStreamReturn => {
@@ -182,6 +184,8 @@ export const useJobStream = (): UseJobStreamReturn => {
   const [data, setData] = useState<JobResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  
+  const [isEditing, setIsEditing] = useState(false);
 
   // We use a ref to store the cleanup function (mock) or EventSource (real)
   const connectionRef = useRef<EventSource | (() => void) | null>(null);
@@ -203,7 +207,7 @@ export const useJobStream = (): UseJobStreamReturn => {
   // ---------------------------------------------------------
   // 1. Final Fetch Logic (The "Get Result" phase)
   // ---------------------------------------------------------
-  const fetchFinalResult = useCallback(async (jobId: string) => {
+  const fetchFinalResult = useCallback(async (jobId: string,isEditing:boolean) => {
     try {
       if (USE_MOCK) {
         // Mock Response
@@ -214,8 +218,43 @@ export const useJobStream = (): UseJobStreamReturn => {
       }
 
       // Real API Call
-      const response = await apiClient.get<JobResponse>(`/jobs/${jobId}`);
-      setData(response.data);
+      console.log("job Stream Final Called.......... ")
+          console.log(`[JobStream] Fetching final result (Edit Mode: ${isEditing})`);
+      const response = await apiClient.get<JobResponse>(`/api/jobs/${jobId}`);
+      console.log("UserJobStreMrespnose:",response.data)
+      const resultData = response.data
+      // setData(response.data);
+      // if(data){
+      //   data.result?.imageUrls.push_back(response.data.result?.imageUrls)
+      // }
+
+         if (isEditing) {
+        // If editing, we APPEND new images to the existing data
+           setData((prevData) => {
+          // TS FIX: Check if both previous and new data have valid results before merging.
+          // If either is missing 'result', we cannot merge, so we just replace.
+          if (!prevData?.result || !resultData.result) {
+            return resultData;
+          }
+
+          // Safe to access properties now
+          const oldImages = prevData.result.imageUrls || [];
+          const newImages = resultData.result.imageUrls || [];
+
+          return {
+            ...resultData,
+            result: {
+              ...resultData.result, // Spreads creditsRemaining and other props
+              imageUrls: [...oldImages, ...newImages]
+            }
+          };
+        });
+      } else {
+        // If not editing, we REPLACE the data completely
+        setData(resultData);
+      }
+      // conso
+
       setStatus(response.data.status);
     } catch (err) {
       console.error(err);
@@ -227,11 +266,17 @@ export const useJobStream = (): UseJobStreamReturn => {
   // ---------------------------------------------------------
   // 2. Start Stream Logic
   // ---------------------------------------------------------
-  const startStream = useCallback((jobId: string) => {
+  const startStream = useCallback((jobId: string , isEditing:boolean = false) => {
     // Reset UI State
+    console.log("startStreamFunCalled........")
+    setIsEditing(isEditing); 
     setStatus('processing');
+      console.log(`[JobStream] Starting stream for ${jobId} (Edit: ${isEditing})`);
     setError(null);
-    setData(null);
+     if (!isEditing) {
+      setData(null);
+    }
+    // setData(null);
     setProgress(0);
     closeStream();
 
@@ -241,7 +286,7 @@ export const useJobStream = (): UseJobStreamReturn => {
         if (msg.status === 'completed') {
           setProgress(100);
           closeStream();
-          fetchFinalResult(jobId);
+          fetchFinalResult(jobId,isEditing);
         } else if (msg.status === 'failed') {
           setStatus('failed');
           setError(msg.error || 'Mock generation failed');
@@ -257,21 +302,23 @@ export const useJobStream = (): UseJobStreamReturn => {
     }
 
     // --- REAL SSE PATH ---
+    console.log("johbId:",jobId)
     const url = `${import.meta.env.VITE_API_URL || ''}/api/jobs/${jobId}/stream`;
     console.log(`[SSE] Connecting: ${url}`);
-    
+    console.log("startStream:url:",url)
+    // web api .. which send the message from source to target 
     const evtSource = new EventSource(url);
     connectionRef.current = evtSource;
 
     evtSource.onmessage = (event) => {
       try {
         const payload: SSEMessage = JSON.parse(event.data);
-
+        console.log("StartStreM,event Data",payload)
         if (payload.progress) setProgress(payload.progress);
 
         if (payload.status === 'completed') {
           closeStream();
-          fetchFinalResult(jobId); // Trigger the single GET request
+          fetchFinalResult(jobId,isEditing); // Trigger the single GET request
         } else if (payload.status === 'failed') {
           closeStream();
           setStatus('failed');
@@ -288,7 +335,7 @@ export const useJobStream = (): UseJobStreamReturn => {
       console.error('SSE Error', e);
       closeStream();
       // Fallback: Check status once in case SSE died but job finished
-      fetchFinalResult(jobId);
+      fetchFinalResult(jobId,isEditing);
     };
 
   }, [closeStream, fetchFinalResult]);
@@ -306,5 +353,5 @@ export const useJobStream = (): UseJobStreamReturn => {
     setProgress(0);
   }, [closeStream]);
 
-  return { startStream, reset, status, data, error, progress };
+  return { startStream, reset, status, data, error, progress ,setIsEditing,isEditing};
 };

@@ -5,9 +5,9 @@ import type { JobResponse,SSEMessage } from '../types';
 export const MOCK_DELAY_MS = 8000; // 8 seconds to generate
 export const MOCK_RESULT_IMAGE = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1964&auto=format&fit=crop";
 const MOCK_VARIANTS = [
-  "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1964&auto=format&fit=crop", // Abstract
+  "https://fvbtgxcbfnzeuyvijsrq.supabase.co/storage/v1/object/public/thumbnails/5dc3e916-dcfd-42ed-8cae-38f29caffa93/438bb6f5-c089-4398-a8b9-e671d70b0a6d/gen_0_1770968408342.png", // Abstract
   "https://images.unsplash.com/photo-1535378437321-29e904d1dd4b?q=80&w=1964&auto=format&fit=crop", // Future
-  "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1964&auto=format&fit=crop"  // Cyber
+  "https://fvbtgxcbfnzeuyvijsrq.supabase.co/storage/v1/object/public/thumbnails/5dc3e916-dcfd-42ed-8cae-38f29caffa93/438bb6f5-c089-4398-a8b9-e671d70b0a6d/gen_2_1770968409416.png"  // Cyber
 ];
 /**
  * Simulates an EventSource stream
@@ -62,7 +62,7 @@ export const getMockJobResult = (jobId: string): JobResponse => ({
   status: 'completed',
   progress: 100,
   result: {
-    imageUrl: MOCK_VARIANTS,
+    imageUrls: MOCK_VARIANTS,
     creditsRemaining: 9 // Mock remaining credits
   }
 });
